@@ -22,7 +22,17 @@
 4. Обробка винятків. Код має правильно обробляти винятки, наприклад, помилки доступу до файлів або директорій.
 """
 import argparse
+import os
 from pathlib import Path
+
+def walk_dir(root: Path) -> None:
+    """
+    Рекурсивно обходить директорію root і друкує повні шляхи до всіх файлів.
+    """
+    for current_root, dirs, files in os.walk(root):
+        base = Path(current_root)
+        for name in files:
+            print(base / name)
 
 def main():
     parser = argparse.ArgumentParser(
@@ -40,34 +50,17 @@ def main():
     )
     args = parser.parse_args()
 
-    print(f"SOURCE: {args.source}")
-    print(f"DEST:   {args.dest}")
+    # Перевіряємо чи існує ця директорія, і що це саме директорія
+    if not args.source.exists():
+        parser.error(f"Source not found: {args.source}")
+    if not args.source.is_dir():
+        parser.error(f"Source is not a directory: {args.source}")
+
+    # Показуємо, що знайдемо
+    print(f"SOURCE: {args.source.resolve()}")
+    print(f"DEST:   {args.dest.resolve()}\n")
+
+    walk_dir(args.source)
 
 if __name__ == "__main__":
     main()
-
-
-
-# COLOR_BLUE = "\033[94m"
-# COLOR_GREEN = "\033[92m"
-# COLOR_RESET = "\033[0m"
-
-# def display_tree(path: Path, indent: str = "", prefix: str = "") -> None:
-#     if path.is_dir():
-#         # Use blue color for directories
-#         print(indent + prefix + COLOR_BLUE + str(path.name) + COLOR_RESET)
-#         indent += "    " if prefix else ""
-
-#         # Get a sorted list of children, with directories last
-#         children = sorted(path.iterdir(), key=lambda x: (x.is_file(), x.name))
-
-#         for index, child in enumerate(children):
-#             # Check if the current child is the last one in the directory
-#             is_last = index == len(children) - 1
-#             display_tree(child, indent, "└── " if is_last else "├── ")
-#     else:
-#         print(indent + prefix + COLOR_GREEN + str(path.name) + COLOR_RESET)
-
-# if __name__ == "__main__":
-#     root = Path("test_data")
-#     display_tree(root)
