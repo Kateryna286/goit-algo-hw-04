@@ -1,12 +1,12 @@
 """
 Завдання 1:
 
-Напишіть програму на Python, яка рекурсивно копіює файли у вихідній директорії, переміщає їх до нової директорії 
+Напишіть програму на Python, яка рекурсивно копіює файли у вихідній директорії, переміщає їх до нової директорії
 та сортує в піддиректорії, назви яких базуються на розширенні файлів.
 
 Також візьміть до уваги наступні умови:
 
-1. Парсинг аргументів. Скрипт має приймати два аргументи командного рядка: шлях до вихідної директорії 
+1. Парсинг аргументів. Скрипт має приймати два аргументи командного рядка: шлях до вихідної директорії
 та шлях до директорії призначення (за замовчуванням, якщо тека призначення не була передана, вона повинна бути з назвою dist).
 
 2. Рекурсивне читання директорій:
@@ -21,18 +21,19 @@
 Файл з відповідним типом має бути скопійований у відповідну піддиректорію.
 4. Обробка винятків. Код має правильно обробляти винятки, наприклад, помилки доступу до файлів або директорій.
 """
+
 import argparse
-import os
 import shutil
 import sys
 from pathlib import Path
+
 
 def extension_folder_for(path: Path) -> str:
     suffixes = [s.lstrip(".").lower() for s in path.suffixes if s]
     return ".".join(suffixes) if suffixes else "no_ext"
 
+
 def unique_target_path(target_dir: Path, src_name: str) -> Path:
-    
     candidate = target_dir / src_name
     if not candidate.exists():
         return candidate
@@ -44,69 +45,67 @@ def unique_target_path(target_dir: Path, src_name: str) -> Path:
             return alt
         i += 1
 
-def copy_all(source: Path, dest_root: Path) -> tuple[int, int]:
-    """
-    Рекурсивно копіює всі файли з source у dest_root/<ext>/...
-    Повертає (copied, skipped).
-    """
-    copied = 0
-    skipped = 0
 
-    source_abs = source.resolve()
+def copy_recursive(current: Path, dest_root: Path, src_root: Path) -> tuple[int, int]:
+    """Мінімалістична рекурсія в стилі display_tree: тека → рекурсія, файл → копіюємо."""
+    copied = skipped = 0
     dest_abs = dest_root.resolve()
 
-    for current_root, dirs, files in os.walk(source_abs):
-        root_path = Path(current_root)
+    try:
+        children = sorted(current.iterdir(), key=lambda p: (p.is_file(), p.name))
+    except OSError as e:
+        print(f"Cannot access {current}: {e}", file=sys.stderr)
+        return 0, 1
 
-        # Якщо dest всередині source — не заходимо туди під час обходу
-        dirs[:] = [d for d in dirs if (root_path / d).resolve() != dest_abs]
-
-        for name in files:
-            src = root_path / name
-            ext_folder = extension_folder_for(src)
-            target_dir = dest_abs / ext_folder
-
-            try:
-                target_dir.mkdir(parents=True, exist_ok=True)
-            except OSError as e:
-                print(f"Cannot create dir {target_dir}: {e}", file=sys.stderr)
-                skipped += 1
-                continue
-
-            dst = unique_target_path(target_dir, src.name)
-
-            try:
-                shutil.copy2(src, dst)
-                print(f"{src.relative_to(source_abs)} -> {dst.relative_to(dest_abs)}")
-                copied += 1
-            except (PermissionError, OSError, shutil.Error) as e:
-                print(f"Failed to copy {src}: {e}", file=sys.stderr)
-                skipped += 1
+    for item in children:
+        try:
+            if item.is_dir():
+                # не заходимо у теку призначення, якщо вона всередині source
+                if item.resolve() == dest_abs:
+                    continue
+                c, s = copy_recursive(item, dest_root, src_root)
+                copied += c
+                skipped += s
+            elif item.is_file():
+                ext_dir = dest_root / extension_folder_for(item)
+                try:
+                    ext_dir.mkdir(parents=True, exist_ok=True)
+                    dst = unique_target_path(ext_dir, item.name)
+                    shutil.copy2(item, dst)
+                    print(
+                        f"{item.relative_to(src_root)} -> {dst.relative_to(dest_root)}"
+                    )
+                    copied += 1
+                except (OSError, shutil.Error) as e:
+                    print(f"Failed to copy {item}: {e}", file=sys.stderr)
+                    skipped += 1
+            else:
+                skipped += 1  # спецфайли/невідомі типи
+        except OSError as e:
+            print(f"Failed on {item}: {e}", file=sys.stderr)
+            skipped += 1
 
     return copied, skipped
+
 
 def main():
     parser = argparse.ArgumentParser(
         description="Copy files from SOURCE_DIR into DEST_DIR, sorted by file extension."
     )
-    # перший аргумент – обов’язковий
     parser.add_argument("source", type=Path, help="Path to the source directory.")
-    # другий – необов’язковий, за замовчуванням 'dist'
     parser.add_argument(
         "dest",
         nargs="?",
         default=Path("dist"),
         type=Path,
-        help='Path to the destination directory (default: "dist").'
+        help='Path to the destination directory (default: "dist").',
     )
     args = parser.parse_args()
 
-    # Перевіряємо чи існує ця директорія, і що це саме директорія
     if not args.source.exists():
         parser.error(f"Source not found: {args.source}")
     if not args.source.is_dir():
         parser.error(f"Source is not a directory: {args.source}")
-
     try:
         args.dest.mkdir(parents=True, exist_ok=True)
     except OSError as e:
@@ -115,8 +114,13 @@ def main():
     print(f"SOURCE: {args.source.resolve()}")
     print(f"DEST:   {args.dest.resolve()}\n")
 
-    copied, skipped = copy_all(args.source, args.dest)
-    print(f"\nDone. Copied: {copied}, skipped: {skipped}. Output: {args.dest.resolve()}")
+    copied, skipped = copy_recursive(
+        args.source.resolve(), args.dest.resolve(), args.source.resolve()
+    )
+    print(
+        f"\nDone. Copied: {copied}, skipped: {skipped}. Output: {args.dest.resolve()}"
+    )
+
 
 if __name__ == "__main__":
     main()
