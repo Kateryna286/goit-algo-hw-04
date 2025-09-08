@@ -25,14 +25,24 @@ import argparse
 import os
 from pathlib import Path
 
+def extension_folder_for(path: Path) -> str:
+    """Повертає назву підпапки за розширенням файлу."""
+    suffixes = [s.lstrip(".").lower() for s in path.suffixes if s]
+    return ".".join(suffixes) if suffixes else "no_ext"
+
 def walk_dir(root: Path) -> None:
     """
-    Рекурсивно обходить директорію root і друкує повні шляхи до всіх файлів.
+    Рекурсивно обходить root і друкує:
+      <відносний_шлях_файлу> -> <папка_за_розширенням>
     """
+    root = root.resolve()
     for current_root, dirs, files in os.walk(root):
         base = Path(current_root)
         for name in files:
-            print(base / name)
+            file_path = base / name
+            rel = file_path.relative_to(root)
+            target = extension_folder_for(file_path)
+            print(f"{rel} -> {target}")
 
 def main():
     parser = argparse.ArgumentParser(
