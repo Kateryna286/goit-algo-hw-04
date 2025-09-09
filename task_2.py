@@ -1,8 +1,3 @@
-"""
-Напишіть програму на Python, яка використовує рекурсію для створення фракталу «сніжинка Коха» за умови,
-що користувач повинен мати можливість вказати рівень рекурсії.
-"""
-
 import turtle
 import math
 
@@ -11,7 +6,7 @@ def koch_curve(t, order, size):
     if order == 0:
         t.forward(size)
     else:
-        for angle in (60, -120, 60, 0):
+        for angle in (60, -120, 60, 0): 
             koch_curve(t, order - 1, size / 3)
             t.left(angle)
 
@@ -28,13 +23,12 @@ def draw_koch_snowflake(
     t.pensize(pen_width)
     t.color(line_color)
 
-    # (необов'язково) пришвидшує отрисовку для великих order
+    # пришвидшує отрисовку для великих order
     turtle.tracer(0, 0)
 
-    # Трохи центруємо фігуру
     h = size * math.sqrt(3) / 2
     t.penup()
-    t.goto(-size / 2, -h / 3)
+    t.goto(-size / 2, h / 3)
     t.pendown()
 
     if fill_color:
@@ -52,5 +46,12 @@ def draw_koch_snowflake(
     turtle.done()
 
 
-# Приклад виклику
-draw_koch_snowflake(order=4, size=360, fill_color=None)
+if __name__ == "__main__":
+    try:
+        order = int(input("Вкажіть рівень рекурсії (ціле число ≥ 0): ").strip())
+        if order < 0:
+            raise ValueError
+    except ValueError:
+        print("Помилка: рівень рекурсії має бути цілим числом ≥ 0.")
+    else:
+        draw_koch_snowflake(order=order, size=360, fill_color=None)
